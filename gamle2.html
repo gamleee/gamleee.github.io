@@ -190,11 +190,11 @@
                 const winnings = Math.floor(ball.bet * multiplier);
                 
                 if (multiplier === 0.01) {
-                    money -= ball.bet; // Lose the betting amount
+                    
                     showWinMessage(`You lost $${ball.bet}!`); // Show losing message
                 } else {
                     money += winnings;
-                    if (multiplier === 25 && Math.random() < 0.1) { // 10% chance for jackpot
+                    if (multiplier === 25) { // 10% chance for jackpot
                         showWinMessage(`JACKPOT! You won $${winnings}!`); // Show jackpot message
                     } else if (winnings > ball.bet) {
                         showWinMessage(`You won $${winnings}!`); // Show winning message

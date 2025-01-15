@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Plinko Gambling</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+            height: 100vh; /* Full viewport height */
+            margin: 0; /* Remove default margin */
+        }
+        canvas {
+            border: 5px solid gold;
+            background: linear-gradient(145deg, #333 0%, #1a1a1a 100%);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            display: block; /* Center canvas */
+            margin: 0 auto; /* Center canvas */
+        }
+        #controls {
+            text-align: center;
+            margin: 20px; /* Increased margin */
+            padding: 20px; /* Increased padding */
+            background: #2d2d2d;
+            border-radius: 10px;
+        }
+        #money {
+            font-size: 32px; /* Increased font size */
+            color: #4CAF50;
+            margin: 20px; /* Increased margin */
+            text-align: center;
+            text-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+        }
+        button {
+            font-size: 24px; /* Increased font size */
+            padding: 15px 30px; /* Increased padding */
+            margin: 0 10px; /* Increased margin */
+            background: linear-gradient(145deg, #ffd700 0%, #ffa500 100%);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: #000;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(255, 215, 0, 0.4);
+        }
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #betAmount {
+            font-size: 16px; /* Reduced font size */
+            padding: 8px; /* Reduced padding */
+            width: 120px; /* Reduced width */
+            margin: 5px; /* Reduced margin */
+            border: 2px solid gold;
+            border-radius: 5px;
+            background: #333;
+            color: #fff;
+        }
+        .win-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            color: gold;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            display: none;
+            z-index: 1000;
+            animation: scale 0.5s infinite;
+        }
+        @keyframes scale {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.1); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div id="money">Money: $100</div>
+    <div id="winMessage" class="win-message"></div> <!-- Added win message element -->
+    <div id="controls">
+        <input type="number" id="betAmount" placeholder="Enter bet amount" min="1" value="10">
+        <button onclick="placeBet()">Drop Ball</button>
+        <button onclick="resetGame()">Reset Game</button>
+    </div>
+    <canvas id="plinkoCanvas" width="600" height="400"></canvas> <!-- Reduced canvas size -->
+
+    <script>
+        const canvas = document.getElementById('plinkoCanvas');
+        const ctx = canvas.getContext('2d');
+        let money = localStorage.getItem('money') ? parseInt(localStorage.getItem('money')) : 100;
+        document.getElementById('money').textContent = `Money: $${money}`; // Display money on load
+        let ball = null;
+        let pegs = [];
+        const slots = [3, 0.5, 1.5, 2, 0.01, 25, 0.01, 2, 1.5, 0.5, 3];
+
+        function initPegs() {
+            pegs = [];
+            const rows = 15; // Reduced rows
+            const spacing = 30; // Reduced spacing
+            
+            for (let row = 0; row < rows; row++) {
+                const offset = row % 2 === 0 ? 0 : spacing / 2;
+                for (let x = spacing; x < canvas.width - spacing; x += spacing) {
+                    let pegX = x + offset;
+                    if (row > rows/2) {
+                        const centerBias = (canvas.width/2 - pegX) * 0.05;
+                        pegX += centerBias;
+                    }
+                    pegs.push({
+                        x: pegX,
+                        y: row * spacing + 30, // Adjusted Y position
+                        radius: 4
+                    });
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#FFF';
+            pegs.forEach(peg => {
+                ctx.beginPath();
+                ctx.arc(peg.x, peg.y, peg.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            const slotWidth = canvas.width / slots.length;
+            for (let i = 0; i < slots.length; i++) {
+                ctx.fillStyle = '#666';
+                ctx.fillRect(i * slotWidth, canvas.height - 40, slotWidth, 40); // Adjusted height
+                ctx.strokeStyle = 'gold';
+                ctx.strokeRect(i * slotWidth, canvas.height - 40, slotWidth, 40); // Adjusted height
+                ctx.fillStyle = (slots[i] === 25) ? '#FFD700' : '#FFF';
+                ctx.font = '16px Arial'; // Reduced font size
+                ctx.fillText(`${slots[i]}x`, i * slotWidth + 10, canvas.height - 10); // Adjusted position
+            }
+
+            if (ball) {
+                ctx.fillStyle = '#FF0';
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function updateBall() {
+            if (!ball) return;
+
+            ball.y += ball.vy;
+            ball.x += ball.vx;
+            ball.vy += 0.6;
+
+            const centerPull = (canvas.width/2 - ball.x) * 0.001;
+            ball.vx += centerPull;
+
+            pegs.forEach(peg => {
+                const dx = ball.x - peg.x;
+                const dy = ball.y - peg.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < ball.radius + peg.radius) {
+                    const angle = Math.atan2(dy, dx);
+                    ball.vx = Math.cos(angle) * 4 + (Math.random() - 0.5) * 2;
+                    ball.vy = Math.abs(ball.vy) * 0.7;
+                    ball.vx += (Math.random() - 0.5) * 0.4;
+                }
+            });
+
+            ball.vx += (Math.random() - 0.5) * 0.3;
+
+            if (ball.x < ball.radius || ball.x > canvas.width - ball.radius) {
+                ball.vx *= -0.5;
+            }
+
+            if (ball.y > canvas.height - ball.radius) {
+                const slotWidth = canvas.width / slots.length;
+                const slot = Math.floor(ball.x / slotWidth);
+                const multiplier = slots[slot];
+                const winnings = Math.floor(ball.bet * multiplier);
+                
+                if (multiplier === 0.01) {
+                    money -= ball.bet; // Lose the betting amount
+                    showWinMessage(`You lost $${ball.bet}!`); // Show losing message
+                } else {
+                    money += winnings;
+                    if (multiplier === 25 && Math.random() < 0.1) { // 10% chance for jackpot
+                        showWinMessage(`JACKPOT! You won $${winnings}!`); // Show jackpot message
+                    } else if (winnings > ball.bet) {
+                        showWinMessage(`You won $${winnings}!`); // Show winning message
+                    } else {
+                        showWinMessage(`You lost $${ball.bet - winnings}!`); // Show losing message
+                    }
+                }
+
+                localStorage.setItem('money', money);
+                document.getElementById('money').textContent = `Money: $${money}`;
+                ball = null;
+            }
+        }
+
+        function placeBet() {
+            if (ball) return;
+
+            const betAmount = parseInt(document.getElementById('betAmount').value);
+            if (isNaN(betAmount) || betAmount <= 0 || betAmount > money) {
+                alert('Invalid bet amount!');
+                return;
+            }
+
+            money -= betAmount;
+            localStorage.setItem('money', money);
+            document.getElementById('money').textContent = `Money: $${money}`;
+
+            ball = {
+                x: canvas.width / 2,
+                y: 0,
+                vx: (Math.random() - 0.5) * 2,
+                vy: 0,
+                radius: 6, // Made the ball slightly smaller
+                bet: betAmount
+            };
+        }
+
+        function resetGame() {
+            if (confirm('Are you sure you want to reset the game? This will set your money back to $100.')) {
+            money = 100;
+            localStorage.setItem('money', money);
+            document.getElementById('money').textContent = `Money: $${money}`;
+            ball = null; // Reset the ball
+            }
+        }
+        
+
+        function showWinMessage(message) {
+            const winMessage = document.getElementById('winMessage');
+            winMessage.textContent = message;
+            winMessage.style.display = 'block';
+            setTimeout(() => {
+                winMessage.style.display = 'none';
+            }, 2000);
+        }
+
+        function gameLoop() {
+            updateBall();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        initPegs();
+        gameLoop();
+    </script>
+</body>
+</html>

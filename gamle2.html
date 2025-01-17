@@ -98,7 +98,7 @@
         <br>
         <input type="number" id="betAmount" placeholder="Enter bet amount" min="1" value="10">
         <input type="number" id="ballCount" placeholder="Number of balls" min="1" value="1" disabled>
-        <button onclick="placeBet()">Drop Ball(s)</button>
+        <button id="dropButton" onclick="placeBet()">Drop Ball(s)</button>
         <button onclick="resetGame()">Reset Game</button>
     </div>
     <canvas id="plinkoCanvas" width="600" height="400"></canvas>
@@ -235,6 +235,9 @@
                     localStorage.setItem(realisticMode ? 'moneyRealistic' : 'moneyUnrealistic', money);
                     document.getElementById('money').textContent = `Money: $${money}`;
                     balls.splice(index, 1);
+                    if (realisticMode) {
+                        document.getElementById('dropButton').disabled = false;
+                    }
                 }
             });
         }
@@ -246,6 +249,11 @@
 
             if (isNaN(betAmount) || isNaN(ballCount) || betAmount <= 0 || ballCount <= 0 || totalBet > money) {
                 alert('Invalid bet amount or ball count!');
+                return;
+            }
+
+            if (realisticMode && balls.length > 0) {
+                alert('Wait for the current ball to finish before dropping another.');
                 return;
             }
 
@@ -263,6 +271,10 @@
                     bet: betAmount
                 });
             }
+
+            if (realisticMode) {
+                document.getElementById('dropButton').disabled = true;
+            }
         }
 
         function resetGame() {
@@ -271,6 +283,9 @@
                 localStorage.setItem(realisticMode ? 'moneyRealistic' : 'moneyUnrealistic', money);
                 document.getElementById('money').textContent = `Money: $${money}`;
                 balls = [];
+                if (realisticMode) {
+                    document.getElementById('dropButton').disabled = false;
+                }
             }
         }
 

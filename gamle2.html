@@ -7,36 +7,36 @@
             background-color: #1a1a1a;
             color: #fff;
             font-family: 'Arial', sans-serif;
-            overflow: hidden; /* Prevent scrolling */
-            height: 100vh; /* Full viewport height */
-            margin: 0; /* Remove default margin */
+            overflow: hidden;
+            height: 100vh;
+            margin: 0;
         }
         canvas {
             border: 5px solid gold;
             background: linear-gradient(145deg, #333 0%, #1a1a1a 100%);
             border-radius: 15px;
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-            display: block; /* Center canvas */
-            margin: 0 auto; /* Center canvas */
+            display: block;
+            margin: 0 auto;
         }
         #controls {
             text-align: center;
-            margin: 20px; /* Increased margin */
-            padding: 20px; /* Increased padding */
+            margin: 20px;
+            padding: 20px;
             background: #2d2d2d;
             border-radius: 10px;
         }
         #money {
-            font-size: 32px; /* Increased font size */
+            font-size: 32px;
             color: #4CAF50;
-            margin: 20px; /* Increased margin */
+            margin: 20px;
             text-align: center;
             text-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
         }
         button {
-            font-size: 24px; /* Increased font size */
-            padding: 15px 30px; /* Increased padding */
-            margin: 0 10px; /* Increased margin */
+            font-size: 24px;
+            padding: 15px 30px;
+            margin: 0 10px;
             background: linear-gradient(145deg, #ffd700 0%, #ffa500 100%);
             border: none;
             border-radius: 10px;
@@ -56,15 +56,18 @@
             cursor: not-allowed;
             transform: none;
         }
-        #betAmount {
-            font-size: 16px; /* Reduced font size */
-            padding: 8px; /* Reduced padding */
-            width: 120px; /* Reduced width */
-            margin: 5px; /* Reduced margin */
+        input {
+            font-size: 16px;
+            padding: 8px;
+            width: 120px;
+            margin: 5px;
             border: 2px solid gold;
             border-radius: 5px;
             background: #333;
             color: #fff;
+        }
+        input[disabled] {
+            cursor: not-allowed;
         }
         .win-message {
             position: fixed;
@@ -87,39 +90,67 @@
 </head>
 <body>
     <div id="money">Money: $100</div>
-    <div id="winMessage" class="win-message"></div> <!-- Added win message element -->
+    <div id="winMessage" class="win-message"></div>
     <div id="controls">
+        <label>
+            <input type="checkbox" id="realisticMode" checked onchange="toggleRealisticMode()"> Realistic Mode
+        </label>
+        <br>
         <input type="number" id="betAmount" placeholder="Enter bet amount" min="1" value="10">
-        <button onclick="placeBet()">Drop Ball</button>
+        <input type="number" id="ballCount" placeholder="Number of balls" min="1" value="1" disabled>
+        <button onclick="placeBet()">Drop Ball(s)</button>
         <button onclick="resetGame()">Reset Game</button>
     </div>
-    <canvas id="plinkoCanvas" width="600" height="400"></canvas> <!-- Reduced canvas size -->
+    <canvas id="plinkoCanvas" width="600" height="400"></canvas>
 
     <script>
         const canvas = document.getElementById('plinkoCanvas');
         const ctx = canvas.getContext('2d');
-        let money = localStorage.getItem('money') ? parseInt(localStorage.getItem('money')) : 100;
-        document.getElementById('money').textContent = `Money: $${money}`; // Display money on load
-        let ball = null;
+        let realisticMode = localStorage.getItem('realisticMode') === null || localStorage.getItem('realisticMode') === 'true';
+        let money = realisticMode && localStorage.getItem('moneyRealistic') ? parseInt(localStorage.getItem('moneyRealistic')) : (!realisticMode && localStorage.getItem('moneyUnrealistic') ? parseInt(localStorage.getItem('moneyUnrealistic')) : 100);
+        let balls = [];
         let pegs = [];
+        let previousBallCount = 1;
         const slots = [3, 0.5, 1.5, 2, 0.01, 25, 0.01, 2, 1.5, 0.5, 3];
+
+        document.getElementById('money').textContent = `Money: $${money}`;
+        document.getElementById('realisticMode').checked = realisticMode;
+        document.getElementById('ballCount').disabled = realisticMode;
+
+        function toggleRealisticMode() {
+            realisticMode = document.getElementById('realisticMode').checked;
+            localStorage.setItem('realisticMode', realisticMode);
+
+            if (realisticMode) {
+                previousBallCount = parseInt(document.getElementById('ballCount').value) || 1;
+                document.getElementById('ballCount').value = 1;
+                document.getElementById('ballCount').disabled = true;
+                document.getElementById('ballCount').style.cursor = 'not-allowed';
+            } else {
+                document.getElementById('ballCount').value = previousBallCount;
+                document.getElementById('ballCount').disabled = false;
+                document.getElementById('ballCount').style.cursor = 'auto';
+            }
+
+            money = realisticMode && localStorage.getItem('moneyRealistic') ? parseInt(localStorage.getItem('moneyRealistic')) : (!realisticMode && localStorage.getItem('moneyUnrealistic') ? parseInt(localStorage.getItem('moneyUnrealistic')) : 100);
+            document.getElementById('money').textContent = `Money: $${money}`;
+        }
 
         function initPegs() {
             pegs = [];
-            const rows = 15; // Reduced rows
-            const spacing = 30; // Reduced spacing
-            
+            const rows = 15;
+            const spacing = 30;
             for (let row = 0; row < rows; row++) {
                 const offset = row % 2 === 0 ? 0 : spacing / 2;
                 for (let x = spacing; x < canvas.width - spacing; x += spacing) {
                     let pegX = x + offset;
-                    if (row > rows/2) {
-                        const centerBias = (canvas.width/2 - pegX) * 0.05;
+                    if (row > rows / 2) {
+                        const centerBias = (canvas.width / 2 - pegX) * 0.05;
                         pegX += centerBias;
                     }
                     pegs.push({
                         x: pegX,
-                        y: row * spacing + 30, // Adjusted Y position
+                        y: row * spacing + 30,
                         radius: 4
                     });
                 }
@@ -138,109 +169,110 @@
             const slotWidth = canvas.width / slots.length;
             for (let i = 0; i < slots.length; i++) {
                 ctx.fillStyle = '#666';
-                ctx.fillRect(i * slotWidth, canvas.height - 40, slotWidth, 40); // Adjusted height
+                ctx.fillRect(i * slotWidth, canvas.height - 40, slotWidth, 40);
                 ctx.strokeStyle = 'gold';
-                ctx.strokeRect(i * slotWidth, canvas.height - 40, slotWidth, 40); // Adjusted height
+                ctx.strokeRect(i * slotWidth, canvas.height - 40, slotWidth, 40);
                 ctx.fillStyle = (slots[i] === 25) ? '#FFD700' : '#FFF';
-                ctx.font = '16px Arial'; // Reduced font size
-                ctx.fillText(`${slots[i]}x`, i * slotWidth + 10, canvas.height - 10); // Adjusted position
+                ctx.font = '16px Arial';
+                ctx.fillText(`${slots[i]}x`, i * slotWidth + 10, canvas.height - 10);
             }
 
-            if (ball) {
+            balls.forEach(ball => {
                 ctx.fillStyle = '#FF0';
                 ctx.beginPath();
                 ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
                 ctx.fill();
-            }
+            });
         }
 
-        function updateBall() {
-            if (!ball) return;
+        function updateBalls() {
+            balls.forEach((ball, index) => {
+                ball.y += ball.vy;
+                ball.x += ball.vx;
+                ball.vy += 0.6;
 
-            ball.y += ball.vy;
-            ball.x += ball.vx;
-            ball.vy += 0.6;
+                const centerPull = (canvas.width / 2 - ball.x) * 0.001;
+                ball.vx += centerPull;
 
-            const centerPull = (canvas.width/2 - ball.x) * 0.001;
-            ball.vx += centerPull;
+                pegs.forEach(peg => {
+                    const dx = ball.x - peg.x;
+                    const dy = ball.y - peg.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
 
-            pegs.forEach(peg => {
-                const dx = ball.x - peg.x;
-                const dy = ball.y - peg.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < ball.radius + peg.radius) {
-                    const angle = Math.atan2(dy, dx);
-                    ball.vx = Math.cos(angle) * 4 + (Math.random() - 0.5) * 2;
-                    ball.vy = Math.abs(ball.vy) * 0.7;
-                    ball.vx += (Math.random() - 0.5) * 0.4;
+                    if (distance < ball.radius + peg.radius) {
+                        const angle = Math.atan2(dy, dx);
+                        ball.vx = Math.cos(angle) * 4 + (Math.random() - 0.5) * 2;
+                        ball.vy = Math.abs(ball.vy) * 0.7;
+                        ball.vx += (Math.random() - 0.5) * 0.4;
+                    }
+                });
+
+                ball.vx += (Math.random() - 0.5) * 0.3;
+
+                if (ball.x < ball.radius || ball.x > canvas.width - ball.radius) {
+                    ball.vx *= -0.5;
+                }
+
+                if (ball.y > canvas.height - ball.radius) {
+                    const slotWidth = canvas.width / slots.length;
+                    const slot = Math.floor(ball.x / slotWidth);
+                    const multiplier = slots[slot];
+                    const winnings = Math.floor(ball.bet * multiplier);
+
+                    if (multiplier === 0.01) {
+                        showWinMessage(`You lost $${ball.bet}!`);
+                    } else {
+                        money += winnings;
+                        if (multiplier === 25) {
+                            showWinMessage(`JACKPOT! You won $${winnings}!`);
+                        } else if (winnings > ball.bet) {
+                            showWinMessage(`You won $${winnings}!`);
+                        } else {
+                            showWinMessage(`You lost $${ball.bet - winnings}!`);
+                        }
+                    }
+
+                    localStorage.setItem(realisticMode ? 'moneyRealistic' : 'moneyUnrealistic', money);
+                    document.getElementById('money').textContent = `Money: $${money}`;
+                    balls.splice(index, 1);
                 }
             });
-
-            ball.vx += (Math.random() - 0.5) * 0.3;
-
-            if (ball.x < ball.radius || ball.x > canvas.width - ball.radius) {
-                ball.vx *= -0.5;
-            }
-
-            if (ball.y > canvas.height - ball.radius) {
-                const slotWidth = canvas.width / slots.length;
-                const slot = Math.floor(ball.x / slotWidth);
-                const multiplier = slots[slot];
-                const winnings = Math.floor(ball.bet * multiplier);
-                
-                if (multiplier === 0.01) {
-                    
-                    showWinMessage(`You lost $${ball.bet}!`); // Show losing message
-                } else {
-                    money += winnings;
-                    if (multiplier === 25) { // 10% chance for jackpot
-                        showWinMessage(`JACKPOT! You won $${winnings}!`); // Show jackpot message
-                    } else if (winnings > ball.bet) {
-                        showWinMessage(`You won $${winnings}!`); // Show winning message
-                    } else {
-                        showWinMessage(`You lost $${ball.bet - winnings}!`); // Show losing message
-                    }
-                }
-
-                localStorage.setItem('money', money);
-                document.getElementById('money').textContent = `Money: $${money}`;
-                ball = null;
-            }
         }
 
         function placeBet() {
-            if (ball) return;
-
             const betAmount = parseInt(document.getElementById('betAmount').value);
-            if (isNaN(betAmount) || betAmount <= 0 || betAmount > money) {
-                alert('Invalid bet amount!');
+            const ballCount = realisticMode ? 1 : parseInt(document.getElementById('ballCount').value);
+            const totalBet = betAmount * ballCount;
+
+            if (isNaN(betAmount) || isNaN(ballCount) || betAmount <= 0 || ballCount <= 0 || totalBet > money) {
+                alert('Invalid bet amount or ball count!');
                 return;
             }
 
-            money -= betAmount;
-            localStorage.setItem('money', money);
+            money -= totalBet;
+            localStorage.setItem(realisticMode ? 'moneyRealistic' : 'moneyUnrealistic', money);
             document.getElementById('money').textContent = `Money: $${money}`;
 
-            ball = {
-                x: canvas.width / 2,
-                y: 0,
-                vx: (Math.random() - 0.5) * 2,
-                vy: 0,
-                radius: 6, // Made the ball slightly smaller
-                bet: betAmount
-            };
+            for (let i = 0; i < ballCount; i++) {
+                balls.push({
+                    x: canvas.width / 2,
+                    y: 0,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: 0,
+                    radius: 6,
+                    bet: betAmount
+                });
+            }
         }
 
         function resetGame() {
             if (confirm('Are you sure you want to reset the game? This will set your money back to $100.')) {
-            money = 100;
-            localStorage.setItem('money', money);
-            document.getElementById('money').textContent = `Money: $${money}`;
-            ball = null; // Reset the ball
+                money = 100;
+                localStorage.setItem(realisticMode ? 'moneyRealistic' : 'moneyUnrealistic', money);
+                document.getElementById('money').textContent = `Money: $${money}`;
+                balls = [];
             }
         }
-        
 
         function showWinMessage(message) {
             const winMessage = document.getElementById('winMessage');
@@ -252,7 +284,7 @@
         }
 
         function gameLoop() {
-            updateBall();
+            updateBalls();
             draw();
             requestAnimationFrame(gameLoop);
         }

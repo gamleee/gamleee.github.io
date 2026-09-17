@@ -225,11 +225,7 @@
                 money += winnings;
                 reels.forEach(reel => reel.classList.add('winning'));
                 showWinMessage(`JACKPOT! $${winnings}!`);
-            } else if (finalNumbers[0] === '9' && finalNumbers[1] === '1' && finalNumbers[2] === '1') {
-                const winnings = betAmount * 1000;
-                money += winnings;
-                reels.forEach(reel => reel.classList.add('winning'));
-                showWinMessage(`Funny date! $${winnings}!`);
+            
 
             } else if (finalNumbers[0] === finalNumbers[1] || 
                       finalNumbers[1] === finalNumbers[2] || 
